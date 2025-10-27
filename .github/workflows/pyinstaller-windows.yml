@@ -3,16 +3,12 @@ name: Build Windows (PyInstaller only)
 on:
   push:
     branches: [ main ]
-    tags: [ "v*" ]          # Release versi
+    tags: [ "v*" ]          # e.g. v1.0.0 will create a Release
   workflow_dispatch: {}
 
 jobs:
   build:
     runs-on: windows-latest
-    env:
-      APP_NAME: AutoBellSchedule
-      EXE_NAME: AutoBellSchedule.exe
-      VERSION: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && replace(github.ref_name, 'v', '') || '0.0.0' }}
 
     steps:
       - name: Checkout
@@ -37,24 +33,43 @@ jobs:
           if (Test-Path "requirements.txt") { pip install -r requirements.txt }
           pip install pyinstaller==6.10
 
+      - name: Compute version & names
+        id: setver
+        shell: pwsh
+        run: |
+          $appName   = "AutoBellSchedule"
+          $exeName   = "AutoBellSchedule.exe"
+          $refName   = "${{ github.ref_name }}"
+          if ("${{ github.ref_type }}" -eq "tag" -and $refName.StartsWith("v")) {
+            $version = $refName.Substring(1)
+          } else {
+            $version = "0.0.0"
+          }
+          echo "appName=$appName"   >> $env:GITHUB_OUTPUT
+          echo "exeName=$exeName"   >> $env:GITHUB_OUTPUT
+          echo "version=$version"   >> $env:GITHUB_OUTPUT
+          echo "Computed version: $version"
+
       - name: Build exe (onefile, no console)
         shell: pwsh
         run: |
           $iconArg = (Test-Path "logo.ico") ? "--icon logo.ico" : ""
-          pyinstaller --noconfirm --noconsole --name $env:APP_NAME $iconArg main.py
+          pyinstaller --noconfirm --noconsole --name "${{ steps.setver.outputs.appName }}" $iconArg main.py
+          Write-Host "Built dist/${{ steps.setver.outputs.appName }}/${{ steps.setver.outputs.exeName }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: dist/${{ env.APP_NAME }}/${{ env.EXE_NAME }}
+          path: dist/${{ steps.setver.outputs.appName }}/${{ steps.setver.outputs.exeName }}
+          if-no-files-found: error
 
       - name: Create Release (on tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: ${{ env.APP_NAME }} v${{ env.VERSION }}
+          name: ${{ steps.setver.outputs.appName }} v${{ steps.setver.outputs.version }}
           draft: false
           prerelease: false
-          files: dist/${{ env.APP_NAME }}/${{ env.EXE_NAME }}
+          files: dist/${{ steps.setver.outputs.appName }}/${{ steps.setver.outputs.exeName }}
