@@ -60,7 +60,6 @@ class App(tk.Tk):
         )
         self.worker.start()
 
-        # server kontrol single-instance
         self._start_control_server()
 
         self.tray = TrayController(self, logo_path, fallback_img=None)
@@ -68,7 +67,7 @@ class App(tk.Tk):
         self.bind("<Unmap>", self._on_minimize)
         self._tick_clock()
 
-    # Single-instance control server
+    # ==== Single-instance control server ====
     def _start_control_server(self):
         def serve():
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -242,15 +241,16 @@ class App(tk.Tk):
         ent = ttk.Entry(tools, textvariable=self.search_var, width=30); ent.pack(side="left", padx=(6, 0))
         self.search_var.trace_add("write", lambda *_: self._apply_filter())
 
-        cols = ("id", "name", "time", "days", "status", "sound")
+        # === Tidak menampilkan ID; gunakan No (nomor urut) ===
+        cols = ("no", "name", "time", "days", "status", "sound")
         self.tree = ttk.Treeview(self.frm_right, columns=cols, show="headings", selectmode="browse")
-        self.tree.heading("id", text="ID", command=lambda: self._sort_by("id"))
+        self.tree.heading("no", text="No", command=lambda: self._sort_by("id"))   # klik "No" → urut ID asli
         self.tree.heading("name", text="Nama", command=lambda: self._sort_by("name"))
         self.tree.heading("time", text="Waktu", command=lambda: self._sort_by("time"))
         self.tree.heading("days", text="Hari", command=lambda: self._sort_by("days"))
         self.tree.heading("status", text="Status", command=lambda: self._sort_by("status"))
         self.tree.heading("sound", text="File Suara", command=lambda: self._sort_by("sound"))
-        self.tree.column("id", width=60, anchor="center", stretch=False)
+        self.tree.column("no", width=60, anchor="center", stretch=False)
         self.tree.column("name", width=180, stretch=True)
         self.tree.column("time", width=90, anchor="center", stretch=False)
         self.tree.column("days", width=260, stretch=True)
@@ -268,7 +268,7 @@ class App(tk.Tk):
 
     def _autosize_columns(self):
         total_width = self.tree.winfo_width()
-        fixed = self.tree.column("id", "width") + self.tree.column("time", "width") + self.tree.column("status", "width")
+        fixed = self.tree.column("no", "width") + self.tree.column("time", "width") + self.tree.column("status", "width")
         pad = 20
         avail = max(0, total_width - fixed - pad)
         w_name = int(avail * 2 / 7)
@@ -360,9 +360,11 @@ class App(tk.Tk):
         if q:
             self._rows_filtered = [
                 r for r in self._rows_all
-                if q in str(r["id"]).lower() or q in r["name"].lower()
-                or q in r["time"].lower() or q in r["days"].lower()
-                or q in r["status"].lower() or q in r["sound"].lower()
+                if q in r["name"].lower()
+                or q in r["time"].lower()
+                or q in r["days"].lower()
+                or q in r["status"].lower()
+                or q in r["sound"].lower()
             ]
         else:
             self._rows_filtered = list(self._rows_all)
@@ -370,8 +372,13 @@ class App(tk.Tk):
 
     def _redraw_rows(self, rows):
         for r in self.tree.get_children(): self.tree.delete(r)
-        for r in rows:
-            self.tree.insert("", "end", values=(r["id"], r["name"], r["time"], r["days"], r["status"], r["sound"]))
+        # isi tabel: nomor urut (1..n), iid = ID asli
+        for idx, r in enumerate(rows, start=1):
+            self.tree.insert(
+                "", "end",
+                iid=str(r["id"]),
+                values=(idx, r["name"], r["time"], r["days"], r["status"], r["sound"])
+            )
         self._refresh_buttons_state()
 
     def _sort_by(self, key, force_reverse=None, redraw_only=False):
@@ -384,7 +391,7 @@ class App(tk.Tk):
         self._sort_key = key
 
         def k(row):
-            if key == "id": return int(row["id"])
+            if key == "id": return int(row["id"])      # klik "No" → urut ID asli
             if key == "time": return row["time"]
             if key == "days": return row["days"]
             if key == "status": return row["status"]
@@ -399,7 +406,18 @@ class App(tk.Tk):
     def _selected_id(self):
         sel = self.tree.selection()
         if not sel: return None
-        return int(self.tree.item(sel[0], "values")[0])
+        try:
+            return int(sel[0])  # iid = ID asli
+        except:
+            item = self.tree.focus()
+            return int(item) if item else None
+
+    # ==== Ambil nama jadwal dari DB untuk pesan GUI ====
+    def _get_name_by_id(self, sid: int):
+        cur = self.conn.cursor()
+        cur.execute("SELECT name FROM schedules WHERE id=?", (sid,))
+        row = cur.fetchone()
+        return row[0] if row else None
 
     def _choose_sound(self):
         initialdir = get_initial_sound_dir()
@@ -456,7 +474,7 @@ class App(tk.Tk):
             )
             self.conn.commit()
             self._load_table()
-            self._set_status(f"Jadwal diperbarui (ID {sid})")
+            self._set_status(f"Jadwal diperbarui: {name} @ {time_str}")
         except Exception as e:
             messagebox.showerror("Gagal", str(e))
         finally:
@@ -465,12 +483,13 @@ class App(tk.Tk):
     def _delete_schedule(self):
         sid = self._selected_id()
         if sid is None: return
-        if not messagebox.askyesno("Konfirmasi", f"Hapus jadwal ID {sid}?"): return
+        nm = self._get_name_by_id(sid) or "jadwal ini"
+        if not messagebox.askyesno("Konfirmasi", f"Hapus {nm}?"): return
         cur = self.conn.cursor()
         cur.execute("DELETE FROM schedules WHERE id=?", (sid,))
         self.conn.commit()
         self._load_table()
-        self._set_status(f"Jadwal dihapus (ID {sid})")
+        self._set_status(f"Jadwal dihapus: {nm}")
         self._refresh_buttons_state()
 
     def _on_select_row(self, _evt):

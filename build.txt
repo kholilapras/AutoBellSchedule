@@ -1,0 +1,20 @@
+Opsi 1 — Satu file (portable)
+pyinstaller ^
+  --name SchoolBell ^
+  --onefile ^
+  --windowed ^
+  --noconsole ^
+  --icon=logo.ico ^
+  --add-data "logo.ico;." ^
+  main.py
+
+
+Build satu folder (startup lebih cepat)
+pyinstaller ^
+  --name SchoolBell ^
+  --onedir ^
+  --windowed ^
+  --noconsole ^
+  --icon=logo.ico ^
+  --add-data "logo.ico;." ^
+  main.py
