@@ -3,7 +3,7 @@ name: Build Windows (PyInstaller only)
 on:
   push:
     branches: [ main ]
-    tags: [ "v*" ]          # e.g. v1.0.0 will create a Release
+    tags: [ "v*" ]
   workflow_dispatch: {}
 
 jobs:
@@ -37,25 +37,27 @@ jobs:
         id: setver
         shell: pwsh
         run: |
-          $appName   = "AutoBellSchedule"
-          $exeName   = "AutoBellSchedule.exe"
-          $refName   = "${{ github.ref_name }}"
+          $appName = "AutoBellSchedule"
+          $exeName = "AutoBellSchedule.exe"
+          $refName = "${{ github.ref_name }}"
           if ("${{ github.ref_type }}" -eq "tag" -and $refName.StartsWith("v")) {
             $version = $refName.Substring(1)
           } else {
             $version = "0.0.0"
           }
-          echo "appName=$appName"   >> $env:GITHUB_OUTPUT
-          echo "exeName=$exeName"   >> $env:GITHUB_OUTPUT
-          echo "version=$version"   >> $env:GITHUB_OUTPUT
+          echo "appName=$appName" >> $env:GITHUB_OUTPUT
+          echo "exeName=$exeName" >> $env:GITHUB_OUTPUT
+          echo "version=$version" >> $env:GITHUB_OUTPUT
           echo "Computed version: $version"
 
       - name: Build exe (onefile, no console)
         shell: pwsh
         run: |
-          $iconArg = (Test-Path "logo.ico") ? "--icon logo.ico" : ""
-          pyinstaller --noconfirm --noconsole --name "${{ steps.setver.outputs.appName }}" $iconArg main.py
-          Write-Host "Built dist/${{ steps.setver.outputs.appName }}/${{ steps.setver.outputs.exeName }}"
+          $args = @('--noconfirm','--noconsole','--name',"${{ steps.setver.outputs.appName }}")
+          if (Test-Path 'logo.ico') { $args += @('--icon','logo.ico') }
+          $args += 'main.py'        # sesuaikan jika entry point Anda bukan main.py
+          pyinstaller @args
+          Get-ChildItem -Recurse dist | Write-Host
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
