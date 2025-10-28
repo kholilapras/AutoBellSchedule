@@ -14,7 +14,7 @@ def resource_path(relative_path: str) -> str:
 
 def user_data_dir() -> str:
     base = os.getenv("APPDATA") or os.path.expanduser("~")
-    return os.path.join(base, "SchoolBell")
+    return os.path.join(base, "AutoBellSchedule")
 
 DATA_DIR = user_data_dir()
 DB_FILE = os.path.join(DATA_DIR, "bell_scheduler.db")

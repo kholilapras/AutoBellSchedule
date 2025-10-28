@@ -1,6 +1,6 @@
-Opsi 1 — Satu file (portable)
+Build Satu file (portable)
 pyinstaller ^
-  --name SchoolBell ^
+  --name AutoBellSchedule ^
   --onefile ^
   --windowed ^
   --noconsole ^
@@ -9,7 +9,7 @@ pyinstaller ^
   main.py
 
 
-Build satu folder (startup lebih cepat)
+Build satu folder (startup cepat)
 pyinstaller ^
   --name SchoolBell ^
   --onedir ^
