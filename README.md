@@ -1,1 +1,1 @@
-# AutoBellSchedule v.10
+# AutoBellSchedule v.1.0
